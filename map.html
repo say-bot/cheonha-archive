@@ -184,7 +184,8 @@ window.WBORDERS={"region":[[542,551,538,539,538,533,534,524,522,517,518,511,514,
     (ADJ[e[0]] = ADJ[e[0]] || []).push(e[1]);
     (ADJ[e[1]] = ADJ[e[1]] || []).push(e[0]);
   });
-  var sel = -1;   // 선택된 지점 index
+  var sel = -1;      // 선택된 지점 index
+  var selTile = null; // 클릭한 타일 {x,y}
   /* 게임 좌표는 1-based, 내부 배열은 0-based */
   function gx(v){ return v+1; }
   var REGCOL = ['#6fc2a4','#dd5648','#cca85a','#7aa7dd','#c98fd0','#7fd08a','#e08b5a','#8fbfd0',
@@ -278,6 +279,33 @@ window.WBORDERS={"region":[[542,551,538,539,538,533,534,524,522,517,518,511,514,
     ctx.scale(z,z);
     ctx.drawImage(terrainCv, -CX, -CY, MW, MH);
     ctx.restore();
+    /* 타일 격자 (충분히 확대됐을 때만) */
+    if(z > 3.2){
+      var c0=tileAt(0,0), c1=tileAt(w,0), c2=tileAt(0,h), c3=tileAt(w,h);
+      var gx0=Math.max(0, Math.min(c0.x,c1.x,c2.x,c3.x)-1);
+      var gx1=Math.min(MW, Math.max(c0.x,c1.x,c2.x,c3.x)+2);
+      var gy0=Math.max(0, Math.min(c0.y,c1.y,c2.y,c3.y)-1);
+      var gy1=Math.min(MH, Math.max(c0.y,c1.y,c2.y,c3.y)+2);
+      if((gx1-gx0)*(gy1-gy0) < 900000){
+        ctx.save();
+        ctx.strokeStyle='rgba(0,0,0,'+Math.min(.3, (z-3.2)*0.10+.10).toFixed(3)+')';
+        ctx.lineWidth=Math.max(0.5, Math.min(1.2, z*0.09));
+        ctx.beginPath();
+        var i, a, b;
+        for(i=gx0;i<=gx1;i++){
+          a=gridM(i,gy0); b=gridM(i,gy1);
+          ctx.moveTo(mx2s(a[0],a[1]), my2s(a[0],a[1]));
+          ctx.lineTo(mx2s(b[0],b[1]), my2s(b[0],b[1]));
+        }
+        for(i=gy0;i<=gy1;i++){
+          a=gridM(gx0,i); b=gridM(gx1,i);
+          ctx.moveTo(mx2s(a[0],a[1]), my2s(a[0],a[1]));
+          ctx.lineTo(mx2s(b[0],b[1]), my2s(b[0],b[1]));
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     /* 주·군 경계 */
     if(showBorders && B){
       strokePolys(B.county, [4,5], 'rgba(240,232,206,.62)', Math.max(1.6, Math.min(3.6, z*2)));
@@ -353,6 +381,33 @@ window.WBORDERS={"region":[[542,551,538,539,538,533,534,524,522,517,518,511,514,
       }
     });
     ctx.globalAlpha=1;
+    /* 클릭한 타일 마커 */
+    if(selTile){
+      var q0=gridM(selTile.x, selTile.y+1), q1=gridM(selTile.x+1, selTile.y+1),
+          q2=gridM(selTile.x+1, selTile.y), q3=gridM(selTile.x, selTile.y);
+      var P=[q0,q1,q2,q3].map(function(m){ return [mx2s(m[0],m[1]), my2s(m[0],m[1])]; });
+      var cxp=(P[0][0]+P[2][0])/2, cyp=(P[0][1]+P[2][1])/2;
+      ctx.save();
+      if(z>1.4){
+        ctx.beginPath();
+        ctx.moveTo(P[0][0],P[0][1]); ctx.lineTo(P[1][0],P[1][1]);
+        ctx.lineTo(P[2][0],P[2][1]); ctx.lineTo(P[3][0],P[3][1]); ctx.closePath();
+        ctx.fillStyle='rgba(111,194,164,.22)'; ctx.fill();
+        ctx.strokeStyle='rgba(150,240,205,.95)'; ctx.lineWidth=Math.max(1.4, z*0.16); ctx.stroke();
+      }
+      /* 항상 보이는 핀 */
+      var pinH=Math.max(13, Math.min(24, 12+z*1.2)), pinR=pinH*0.42;
+      ctx.beginPath();
+      ctx.arc(cxp, cyp-pinH, pinR, Math.PI*0.15, Math.PI*0.85, true);
+      ctx.lineTo(cxp, cyp);
+      ctx.closePath();
+      ctx.fillStyle='rgba(111,194,164,.95)';
+      ctx.strokeStyle='rgba(8,14,17,.9)'; ctx.lineWidth=1.6;
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cxp, cyp-pinH, pinR*0.42, 0, 6.2832);
+      ctx.fillStyle='rgba(8,20,18,.9)'; ctx.fill();
+      ctx.restore();
+    }
     /* 주 이름 */
     if(showBorders && B && B.labels && z<3.2){
       var fs=Math.max(13, Math.min(26, 15+z*7));
@@ -403,17 +458,42 @@ window.WBORDERS={"region":[[542,551,538,539,538,533,534,524,522,517,518,511,514,
     return best;
   }
 
-  var drag=null;
+  var drag=null, ptrs=new Map(), pinch=null;
+  function pinchInfo(){
+    var a=[]; ptrs.forEach(function(p){ a.push(p); });
+    var dx=a[0].x-a[1].x, dy=a[0].y-a[1].y;
+    return { d:Math.hypot(dx,dy), mx:(a[0].x+a[1].x)/2, my:(a[0].y+a[1].y)/2 };
+  }
   cv.addEventListener('pointerdown',function(e){
-    drag={x:e.clientX,y:e.clientY,cx:view.cx,cy:view.cy,moved:false};
-    cv.classList.add('drag'); cv.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+    if(ptrs.size===2){
+      var pi=pinchInfo();
+      pinch={d0:pi.d, m0:{x:pi.mx,y:pi.my}, s0:view.s, cx0:view.cx, cy0:view.cy};
+      drag=null; tip.style.display='none';
+      return;
+    }
+    if(ptrs.size===1){
+      drag={x:e.clientX,y:e.clientY,cx:view.cx,cy:view.cy,moved:false};
+      cv.classList.add('drag');
+    }
   });
   cv.addEventListener('pointermove',function(e){
+    if(ptrs.has(e.pointerId)) ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pinch && ptrs.size>=2){
+      var pi=pinchInfo();
+      var f=Math.max(0.12/pinch.s0, Math.min(24/pinch.s0, pi.d/Math.max(pinch.d0,1)));
+      view.s=pinch.s0*f;
+      view.cx=pi.mx-(pinch.m0.x-pinch.cx0)*f;
+      view.cy=pi.my-(pinch.m0.y-pinch.cy0)*f;
+      draw(); return;
+    }
     if(drag){
       view.cx=drag.cx+(e.clientX-drag.x); view.cy=drag.cy+(e.clientY-drag.y);
       if(Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>4) drag.moved=true;
       draw(); return;
     }
+    if(e.pointerType && e.pointerType!=='mouse') return;
     var n=pick(e.clientX,e.clientY);
     if(n){
       tip.style.display='block';
@@ -427,8 +507,14 @@ window.WBORDERS={"region":[[542,551,538,539,538,533,534,524,522,517,518,511,514,
     } else tip.style.display='none';
   });
   cv.addEventListener('pointerup',function(e){
+    ptrs.delete(e.pointerId);
+    if(pinch){
+      if(ptrs.size<2){ pinch=null; drag=null; cv.classList.remove('drag'); }
+      return;
+    }
     if(drag&&!drag.moved){
       var n=pick(e.clientX,e.clientY), t=tileAt(e.clientX,e.clientY), box=$('tile');
+      if(t.x>=0&&t.y>=0&&t.x<MW&&t.y<MH) selTile={x:t.x,y:t.y}; else selTile=null;
       if(n){
         var i=D.nodes.indexOf(n);
         sel = (sel===i) ? -1 : i;
@@ -456,7 +542,11 @@ window.WBORDERS={"region":[[542,551,538,539,538,533,534,524,522,517,518,511,514,
     }
     drag=null; cv.classList.remove('drag');
   });
-  cv.addEventListener('pointercancel',function(){ drag=null; cv.classList.remove('drag'); });
+  cv.addEventListener('pointercancel',function(e){
+    ptrs.delete(e.pointerId);
+    if(ptrs.size<2) pinch=null;
+    if(!ptrs.size){ drag=null; cv.classList.remove('drag'); }
+  });
   cv.addEventListener('pointerleave',function(){ tip.style.display='none'; });
   cv.addEventListener('wheel',function(e){
     e.preventDefault();
