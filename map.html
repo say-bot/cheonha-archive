@@ -374,19 +374,29 @@ window.WBORDERS={"region":[[1007,471,1013,462,1013,459,1017,458,1019,455,1021,45
       if(labelMode==='all') show=true;
       else if(labelMode!=='none'){
         if(hit) show=true;
-        else if(n.k===3) show=true;
-        else if(n.k===2) show=z>0.42;
-        else if(n.k===1) show=z>0.85;
-        else if(n.k===0) show=z>1.5;
-        else show=z>3.2;
+        else if(n.k===3) show=true;            // 핵심지는 항상
+        else if(n.k===2) show=z>=0.42;         // 주부
+        else if(n.k<=1) show=z>=0.80;          // 군부·현성 — 0.80배부터 전부
+        else if(n.k===4) show=z>=1.6;          // 관문
+        else show=z>3.2;                       // 나루터·부두
       }
       if(show){
-        ctx.font=(n.k===3?13:n.k===2?12:11)+'px "Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif';
-        ctx.textAlign='center'; ctx.textBaseline='bottom';
-        ctx.lineWidth=3; ctx.strokeStyle='rgba(6,10,12,.92)';
-        ctx.strokeText(n.n,X,Y-s-2);
-        ctx.fillStyle=dim?'rgba(236,230,214,.4)':'#ece6d6';
-        ctx.fillText(n.n,X,Y-s-2);
+        var fs=(n.k===3?13.5:n.k===2?12.5:11.5);
+        ctx.font=fs+'px "Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif';
+        ctx.textBaseline='bottom'; ctx.textAlign='left';
+        var lvT = n.lv ? (n.lv+' ') : '';
+        var wl = lvT ? ctx.measureText(lvT).width : 0;
+        var wn = ctx.measureText(n.n).width;
+        var lx = X-(wl+wn)/2, ly = Y-s-2;
+        ctx.lineWidth=3.2; ctx.strokeStyle='rgba(6,10,12,.94)';
+        if(lvT) ctx.strokeText(lvT,lx,ly);
+        ctx.strokeText(n.n,lx+wl,ly);
+        if(lvT){
+          ctx.fillStyle = dim?'rgba(240,200,105,.4)':'#f2c95f';
+          ctx.fillText(lvT,lx,ly);
+        }
+        ctx.fillStyle = dim?'rgba(236,230,214,.4)':'#ece6d6';
+        ctx.fillText(n.n,lx+wl,ly);
       }
     });
     ctx.globalAlpha=1;
