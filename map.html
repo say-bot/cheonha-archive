@@ -629,7 +629,15 @@ window.WBORDERS={"region":[[542,551,538,539,538,533,534,524,522,517,518,511,514,
   $('listSort').addEventListener('change',renderList);
 
   renderList();
-  window.addEventListener('resize',function(){ if(ready){ resize(); draw(); } });
+  /* 화면 크기가 바뀌어도(회전 등) 보던 지점이 계속 가운데 오도록 */
+  var prevW=window.innerWidth, prevH=window.innerHeight;
+  window.addEventListener('resize',function(){
+    if(!ready) return;
+    var w=window.innerWidth, h=window.innerHeight;
+    view.cx += (w-prevW)/2; view.cy += (h-prevH)/2;
+    prevW=w; prevH=h;
+    resize(); draw();
+  });
 })();
 </script>
 </body>
