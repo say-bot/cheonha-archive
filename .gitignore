@@ -2,3 +2,7 @@ source.html
 .DS_Store
 __pycache__/
 *.pyc
+s2/source.html
+build_s2.py
+decrypt.py
+rebuild.ps1
