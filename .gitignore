@@ -6,3 +6,4 @@ s2/source.html
 build_s2.py
 decrypt.py
 rebuild.ps1
+encrypt_map.py
