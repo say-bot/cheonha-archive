@@ -7,3 +7,5 @@ build_s2.py
 decrypt.py
 rebuild.ps1
 encrypt_map.py
+s2/db-source.html
+build_db.py
