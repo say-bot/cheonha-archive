@@ -12,3 +12,4 @@ build_db.py
 s3/source.html
 s3/art_*.html
 build_s3.py
+s3/figs/
